@@ -1,0 +1,75 @@
+'''
+This code is writing in JS, using in Google Earth Engine to extract data in our WF area and NWF buffers.  
+'''
+var lst_aqua = ee.ImageCollection("MODIS/006/MYD11A2"),
+    lst_terra = ee.ImageCollection("MODIS/006/MOD11A2"),
+    veg_terra = ee.ImageCollection("MODIS/006/MOD13A2"),
+    veg_aqua = ee.ImageCollection("MODIS/006/MYD13A2"),
+    albedo = ee.ImageCollection("MODIS/MCD43B3"),
+    pre = ee.ImageCollection("TRMM/3B42"),
+    LC = ee.ImageCollection("MODIS/006/MCD12Q1"),
+    LCT2011 = ee.Image("MODIS/006/MCD12Q1/2011_01_01"),
+    us_wf = ee.FeatureCollection("users/qinyz666/wf"),
+    nwf_2 = ee.FeatureCollection("users/qinyz666/wf_buffer_2km"),
+    nwf_2_4 = ee.FeatureCollection("users/qinyz666/nwf_2_4km"),
+    nwf_4_6 = ee.FeatureCollection("users/qinyz666/nwf_4_6km"),
+    nwf_6_8 = ee.FeatureCollection("users/qinyz666/nwf_6_8km"),
+    nwf_8_10 = ee.FeatureCollection("users/qinyz666/nwf_8_10km"),
+
+
+ var cc1 =ee.FeatureCollection(us_wf).select("cluster");
+ var cc2 =ee.FeatureCollection(nwf_2).select("cluster");
+ var cc2_4 =ee.FeatureCollection(nwf_2_4).select("cluster");
+ var cc4_6 =ee.FeatureCollection(nwf_4_6).select("cluster");
+ var cc6_8 =ee.FeatureCollection(nwf_6_8).select("cluster");
+ var cc8_10 =ee.FeatureCollection(nwf_8_10).select("cluster");
+ 
+Map.addLayer(cc1,{color:'	#FF0000'},'wf');
+Map.addLayer(cc2_4,{color:'	#0000CD'},'wf');
+Map.addLayer(cc4_6,{color:'	#4169E1'},'wf');
+Map.addLayer(cc6_8,{color:'	#6495ED'},'wf');
+Map.addLayer(cc8_10,{color:'	#B0C4DE'},'wf');
+ 
+ 
+print(cc1)
+var img=LCT2011.select("LC_Type1");
+ var LCT1= img.neq(17);//exclude the water bodies;
+// load in data
+var lst_aqua_day = lst_aqua.filterDate('2000-01-01','2018-12-31').select('LST_Day_1km');   //Aqua start at 2002_07_04
+var lst_aqua_night = lst_aqua.filterDate('2000-01-01','2018-12-31').select('LST_Night_1km');
+var lst_terra_day = lst_terra.filterDate('2002-01-01','2018-12-31').select('LST_Day_1km');   //terra start at 2000_02_18
+var lst_terra_night = lst_terra.filterDate('2002-01-01','2018-12-31').select('LST_Night_1km');
+var ndvi_aqua = veg_aqua.filterDate('2000-01-01','2018-12-31').select('NDVI');   //Aqua start at 2002_07_04
+var ndvi_terra = veg_terra.filterDate('2000-01-01','2018-12-31').select('NDVI');   //terra start at 2000_02_18
+var albedo_day = albedo.filterDate('2000-01-01','2018-12-31').select('Albedo_WSA_shortwave');   //terra start at 2000_02_18
+var evi_aqua = veg_aqua.filterDate('2000-01-01','2018-12-31').select('EVI');   //Aqua start at 2002_07_04
+var evi_terra = veg_terra.filterDate('2000-01-01','2018-12-31').select('EVI');   //Aqua start at 2000_02_18
+function Mask1(image){
+  return image.updateMask(LCT1);
+}
+ var final1= evi_terra.map(Mask1);
+ var results = final1.map(function(image) {
+  return image.reduceRegions({
+     collection: cc8_10,
+     reducer: ee.Reducer.mean()
+    // scale: 4000
+  }) 
+  .select(['.*'],null,false)
+  .map(function(feature) {
+    return feature.set('date',image.get('system:index'));
+    // return feature.set('date', image.date().format())
+  });
+}).flatten();
+
+// results =results.map(function(feat) {
+//         return removeProperty1(feat, 'system:index')})
+
+print(cc1.first());
+Export.table.toDrive({
+  collection: results,
+  description: 'wf_evi_terra_8_10',
+  folder: "US/wf",
+  // folder: 'GEE_geohackweek',
+  fileFormat: 'CSV'
+});   
+ 

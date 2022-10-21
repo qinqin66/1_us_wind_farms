@@ -1,1 +1,1 @@
-# 1_us_wind_farms
+'These codes are used to repear the results of wind farm paper'
